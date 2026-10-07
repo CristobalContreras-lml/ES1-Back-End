@@ -1,6 +1,6 @@
 """Formulario del lote.
 
-La validacion vive aca y no repartida dentro de la vista: asi el mismo
+La validación vive acá y no repartida dentro de la vista: así el mismo
 formulario sirve para crear y para editar, y la vista queda corta.
 """
 
@@ -21,7 +21,7 @@ class LoteForm(forms.ModelForm):
             "vence": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
         error_messages = {
-            "cantidad": {"invalid": "La cantidad debe ser un numero entero."},
+            "cantidad": {"invalid": "La cantidad debe ser un número entero."},
             "vence": {"invalid": "La fecha va en formato AAAA-MM-DD."},
         }
 
@@ -47,21 +47,21 @@ class LoteForm(forms.ModelForm):
         if cantidad <= 0:
             raise forms.ValidationError("La cantidad debe ser mayor que 0.")
         if cantidad > 100000:
-            raise forms.ValidationError("Esa cantidad parece un error de tipeo (maximo 100.000).")
+            raise forms.ValidationError("Esa cantidad parece un error de tipeo (máximo 100.000).")
         return cantidad
 
     def clean_vence(self):
         vence = self.cleaned_data["vence"]
-        # Un lote que vence en 2050 casi siempre es un ano mal escrito.
+        # Un lote que vence en 2050 casi siempre es un año mal escrito.
         if vence.year > timezone.now().year + 10:
-            raise forms.ValidationError("Revisa el ano: la fecha esta demasiado lejos.")
+            raise forms.ValidationError("Revisa el año: la fecha está demasiado lejos.")
         return vence
 
     def clean(self):
         """Regla de negocio: no se recibe en bodega un lote ya vencido.
 
-        Se apoya en la misma clasificacion de solucion.py en vez de volver
-        a comparar fechas aqui.
+        Se apoya en la misma clasificación de solucion.py en vez de volver
+        a comparar fechas aquí.
         """
         datos = super().clean()
         categoria = datos.get("categoria")
@@ -73,7 +73,7 @@ class LoteForm(forms.ModelForm):
             if lote.estado_actual == "ROJO":
                 self.add_error(
                     "vence",
-                    "El lote ya esta vencido: no se puede recibir en bodega. "
-                    "Si llego igual, registralo como merma desde el administrador.",
+                    "El lote ya está vencido: no se puede recibir en bodega. "
+                    "Si llegó igual, regístralo como merma desde el administrador.",
                 )
         return datos

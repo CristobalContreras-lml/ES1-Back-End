@@ -9,12 +9,12 @@
   <div class="tarjeta t-rojo"><span class="n">{{ rojos }}</span><span class="t">Vencidos</span></div>
   <div class="tarjeta t-amarillo"><span class="n">{{ amarillos }}</span><span class="t">Por vencer</span></div>
   <div class="tarjeta t-verde"><span class="n">{{ verdes }}</span><span class="t">Vigentes</span></div>
-  <div class="tarjeta t-gris"><span class="n">{{ invalidos }}</span><span class="t">Dato invalido</span></div>
+  <div class="tarjeta t-gris"><span class="n">{{ invalidos }}</span><span class="t">Dato inválido</span></div>
 </div>
 
 {% if unidades_en_riesgo %}
   <div class="msg aviso">
-    Hay {{ unidades_en_riesgo }} unidades vencidas todavia en bodega. Sacalas como merma.
+    Hay {{ unidades_en_riesgo }} unidades vencidas todavía en bodega. Sácalas como merma.
   </div>
 {% endif %}
 
@@ -26,7 +26,7 @@
       <option value="ROJO" {% if filtro == "ROJO" %}selected{% endif %}>Vencidos</option>
       <option value="AMARILLO" {% if filtro == "AMARILLO" %}selected{% endif %}>Por vencer</option>
       <option value="VERDE" {% if filtro == "VERDE" %}selected{% endif %}>Vigentes</option>
-      <option value="INVALIDO" {% if filtro == "INVALIDO" %}selected{% endif %}>Dato invalido</option>
+      <option value="INVALIDO" {% if filtro == "INVALIDO" %}selected{% endif %}>Dato inválido</option>
     </select>
     <button type="submit" class="btn btn-sec">Filtrar</button>
     {% if busqueda or filtro %}<a href="{% url 'lista' %}" class="btn btn-sec">Limpiar</a>{% endif %}
@@ -41,8 +41,8 @@
 <table>
   <thead>
     <tr>
-      <th>Insumo</th><th>Categoria</th><th>Lote</th><th>Cant.</th>
-      <th>Vence</th><th>Dias</th><th>Estado hoy</th><th></th>
+      <th>Insumo</th><th>Categoría</th><th>Lote</th><th>Cant.</th>
+      <th>Vence</th><th>Días</th><th>Estado hoy</th><th></th>
     </tr>
   </thead>
   <tbody>
@@ -78,9 +78,9 @@
 {% else %}
   <div class="vacio">
     {% if busqueda or filtro %}
-      No hay lotes que coincidan con la busqueda.
+      No hay lotes que coincidan con la búsqueda.
     {% else %}
-      Todavia no hay lotes registrados.
+      Todavía no hay lotes registrados.
     {% endif %}
   </div>
 {% endif %}

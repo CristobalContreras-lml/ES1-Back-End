@@ -1,8 +1,8 @@
 """Modelo de la Eva 2.
 
 Cada lote que antes era un diccionario dentro de datos.json ahora es una
-fila en SQLite. La regla de decision NO se reescribe aqui: se importa
-desde solucion.py, igual que hacia la vista de la ES1.
+fila en SQLite. La regla de decisión NO se reescribe aquí: se importa
+desde solucion.py, igual que hacía la vista de la ES1.
 """
 
 from django.core.validators import MinValueValidator
@@ -15,28 +15,28 @@ from solucion import UMBRALES, clasificar_insumo
 class Lote(models.Model):
     """Un lote de insumo que entra a bodega.
 
-    Los campos salen de las claves que ya tenia cada registro en
+    Los campos salen de las claves que ya tenía cada registro en
     datos.json: nombre, categoria, lote, cantidad y vence.
     """
 
-    # Las categorias validas son las mismas de solucion.py. Se generan
+    # Las categorías válidas son las mismas de solucion.py. Se generan
     # desde UMBRALES para no tener la lista escrita en dos lugares: si
-    # manana se agrega "Congelados" al diccionario, el choices lo toma solo.
+    # mañana se agrega "Congelados" al diccionario, el choices lo toma solo.
     CATEGORIA_CHOICES = [(c, c) for c in UMBRALES]
 
     nombre = models.CharField(max_length=100)
     categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES)
-    numero_lote = models.CharField("numero de lote", max_length=30)
+    numero_lote = models.CharField("número de lote", max_length=30)
     cantidad = models.IntegerField(validators=[MinValueValidator(1)])
     vence = models.DateField("fecha de vencimiento")
 
     # Foto del estado al momento de registrar el lote. NO es el estado de
-    # hoy: para eso estan las propiedades de mas abajo.
+    # hoy: para eso están las propiedades de más abajo.
     estado_registro = models.CharField(max_length=20)
     motivo_registro = models.CharField(max_length=300)
     fecha_registro = models.DateTimeField(default=timezone.now)
 
-    # Borrado logico: el lote se oculta pero la merma queda registrada.
+    # Borrado lógico: el lote se oculta pero la merma queda registrada.
     eliminado = models.BooleanField(default=False)
     fecha_eliminacion = models.DateTimeField(null=True, blank=True)
 
@@ -49,8 +49,8 @@ class Lote(models.Model):
         return f"{self.nombre} ({self.numero_lote}) - {self.estado_actual}"
 
     # -----------------------------------------------------------------
-    # Estado de HOY. Un lote registrado como VERDE puede ser ROJO manana,
-    # asi que el semaforo se recalcula en cada consulta en vez de confiar
+    # Estado de HOY. Un lote registrado como VERDE puede ser ROJO mañana,
+    # así que el semáforo se recalcula en cada consulta en vez de confiar
     # en lo guardado. Es el mismo criterio de la vista de la ES1.
     # -----------------------------------------------------------------
 
@@ -76,7 +76,7 @@ class Lote(models.Model):
 
     @property
     def cambio_de_estado(self):
-        """True si el lote ya no esta en el estado con el que se registro."""
+        """True si el lote ya no está en el estado con el que se registró."""
         return self.estado_registro != self.estado_actual
 
     # -----------------------------------------------------------------

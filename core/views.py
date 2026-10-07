@@ -1,6 +1,6 @@
 """Vistas de la Eva 2.
 
-Los datos ya no salen de datos.json sino de SQLite. La regla de decision
+Los datos ya no salen de datos.json sino de SQLite. La regla de decisión
 sigue siendo la misma de la ES1: se importa, no se copia.
 """
 
@@ -16,7 +16,7 @@ from .models import Lote
 from .permisos import ROL_ADMIN, ROL_NORMAL, ROL_VIEWER, requiere_rol
 
 # ---------------------------------------------------------------
-# Sesion
+# Sesión
 # ---------------------------------------------------------------
 
 
@@ -34,8 +34,8 @@ def vista_login(request):
             login(request, usuario)
             messages.success(request, f"Bienvenido, {usuario.username}.")
             return redirect("lista")
-        # Mensaje generico: no se dice cual de los dos datos fallo.
-        messages.error(request, "Usuario o contrasena incorrectos.")
+        # Mensaje genérico: no se dice cuál de los dos datos falló.
+        messages.error(request, "Usuario o contraseña incorrectos.")
 
     return render(request, "login.html")
 
@@ -43,7 +43,7 @@ def vista_login(request):
 @login_required(login_url="login")
 def vista_logout(request):
     logout(request)
-    messages.info(request, "Sesion cerrada.")
+    messages.info(request, "Sesión cerrada.")
     return redirect("login")
 
 
@@ -57,7 +57,7 @@ def lista(request):
     """READ. Todos los usuarios autenticados pueden mirar."""
     lotes = Lote.objects.filter(eliminado=False)
 
-    # Buscador por nombre o numero de lote (era un Should de la ES1).
+    # Buscador por nombre o número de lote (era un Should de la ES1).
     busqueda = request.GET.get("q", "").strip()
     if busqueda:
         lotes = lotes.filter(Q(nombre__icontains=busqueda) | Q(numero_lote__icontains=busqueda))
@@ -118,7 +118,7 @@ def editar(request, pk):
         form = LoteForm(request.POST, instance=lote)
         if form.is_valid():
             lote = form.save(commit=False)
-            # Se vuelve a clasificar: si cambio la cantidad o la fecha, el
+            # Se vuelve a clasificar: si cambió la cantidad o la fecha, el
             # estado guardado ya no corresponde.
             lote.guardar_clasificado()
             messages.success(request, f"Lote {lote.numero_lote} actualizado.")
@@ -132,7 +132,7 @@ def editar(request, pk):
 
 @requiere_rol(ROL_ADMIN)
 def eliminar(request, pk):
-    """DELETE logico. La merma no se borra, se oculta."""
+    """DELETE lógico. La merma no se borra, se oculta."""
     lote = get_object_or_404(Lote, pk=pk, eliminado=False)
 
     if request.method == "POST":

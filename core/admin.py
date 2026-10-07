@@ -1,4 +1,4 @@
-"""Administrador de Django para la gestion de lotes."""
+"""Administrador de Django para la gestión de lotes."""
 
 from django.contrib import admin, messages
 from django.utils.html import format_html
@@ -32,7 +32,7 @@ class LoteAdmin(admin.ModelAdmin):
     list_per_page = 25
 
     # La foto del registro y las fechas no se editan a mano: las calcula
-    # el sistema. Si se pudieran escribir, la ficha podria mentir.
+    # el sistema. Si se pudieran escribir, la ficha podría mentir.
     readonly_fields = (
         "estado_registro",
         "motivo_registro",
@@ -45,11 +45,11 @@ class LoteAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Datos del lote", {"fields": ("nombre", "categoria", "numero_lote", "cantidad", "vence")}),
         (
-            "Clasificacion",
+            "Clasificación",
             {
                 "fields": ("semaforo", "dias_restantes", "estado_registro", "motivo_registro"),
-                "description": "El semaforo se recalcula con la fecha de hoy. "
-                "El estado de registro es la foto del dia en que entro el lote.",
+                "description": "El semáforo se recalcula con la fecha de hoy. "
+                "El estado de registro es la foto del día en que entró el lote.",
             },
         ),
         ("Trazabilidad", {"fields": ("fecha_registro", "eliminado", "fecha_eliminacion")}),
@@ -66,14 +66,14 @@ class LoteAdmin(admin.ModelAdmin):
             '<b style="color:{}">{}</b>', COLORES.get(estado, "#000"), estado
         )
 
-    @admin.display(description="Dias")
+    @admin.display(description="Días")
     def dias_restantes(self, obj):
         dias = obj.dias_restantes
         return "sin fecha" if dias is None else dias
 
     # ---------------- acciones masivas ----------------
 
-    @admin.action(description="Dar de baja los lotes seleccionados (borrado logico)")
+    @admin.action(description="Dar de baja los lotes seleccionados (borrado lógico)")
     def dar_de_baja(self, request, queryset):
         contador = 0
         for lote in queryset.filter(eliminado=False):
@@ -92,7 +92,7 @@ class LoteAdmin(admin.ModelAdmin):
     # ---------------- permisos por usuario ----------------
     # El admin de Django ya respeta los permisos de cada grupo
     # (core.add_lote, core.change_lote, core.delete_lote). Aca solo se
-    # agrega una regla propia: el borrado fisico queda reservado al
+    # agrega una regla propia: el borrado físico queda reservado al
     # superusuario, porque la merma tiene que quedar registrada.
 
     def has_delete_permission(self, request, obj=None):

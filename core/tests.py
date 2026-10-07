@@ -2,7 +2,7 @@
 
 Se corren con:  python manage.py test
 Cubren las tres cosas que se pueden romper sin que se note:
-la regla de decision, el CRUD y los permisos por rol.
+la regla de decisión, el CRUD y los permisos por rol.
 """
 
 from datetime import timedelta
@@ -109,7 +109,7 @@ class CrudTest(TestCase):
 
         self.assertEqual(Lote.objects.count(), 0)
         self.assertEqual(respuesta.status_code, 200)  # vuelve al formulario, no 500
-        self.assertContains(respuesta, "numero entero")
+        self.assertContains(respuesta, "número entero")
 
     def test_crear_con_cantidad_cero_muestra_error(self):
         self.client.post(reverse("crear"), self.datos(cantidad=0))
@@ -119,7 +119,7 @@ class CrudTest(TestCase):
         respuesta = self.client.post(reverse("crear"), self.datos(vence=fecha_en(-5).isoformat()))
 
         self.assertEqual(Lote.objects.count(), 0)
-        self.assertContains(respuesta, "ya esta vencido")
+        self.assertContains(respuesta, "ya está vencido")
 
     def test_editar_recalcula_el_estado(self):
         self.client.post(reverse("crear"), self.datos())
@@ -245,7 +245,7 @@ class SesionTest(TestCase):
         respuesta = self.client.post(
             reverse("login"), {"username": "lector", "password": "equivocada"}
         )
-        self.assertContains(respuesta, "Usuario o contrasena incorrectos")
+        self.assertContains(respuesta, "Usuario o contraseña incorrectos")
 
     def test_la_contrasena_no_se_guarda_en_texto_plano(self):
         self.assertNotEqual(self.usuario.password, "clave-de-prueba-1")

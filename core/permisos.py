@@ -1,6 +1,6 @@
 """Control de acceso por rol.
 
-La restriccion va en el servidor. Esconder un boton en la plantilla no
+La restricción va en el servidor. Esconder un botón en la plantilla no
 sirve de nada: cualquiera puede escribir la direccion a mano.
 """
 
@@ -34,7 +34,7 @@ def requiere_rol(*roles):
         def wrapper(request, *args, **kwargs):
             if tiene_rol(request.user, *roles):
                 return view_func(request, *args, **kwargs)
-            messages.error(request, "No tienes permiso para esta accion.")
+            messages.error(request, "No tienes permiso para esta acción.")
             return redirect("lista")
 
         return wrapper

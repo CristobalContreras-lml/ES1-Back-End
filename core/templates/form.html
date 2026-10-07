@@ -7,7 +7,7 @@
   {% if lote %}
     Al guardar se vuelve a clasificar con la fecha de hoy.
   {% else %}
-    El semaforo se calcula solo al guardar.
+    El semáforo se calcula solo al guardar.
   {% endif %}
 </p>
 
@@ -26,7 +26,7 @@
         {% for e in campo.errors %}<li>{{ e }}</li>{% endfor %}
       </ul>{% endif %}
       {% if campo.name == "categoria" %}
-        <p class="ayuda">Cada categoria avisa con distinta anticipacion.</p>
+        <p class="ayuda">Cada categoría avisa con distinta anticipación.</p>
       {% endif %}
     </div>
   {% endfor %}
