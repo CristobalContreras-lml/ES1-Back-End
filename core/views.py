@@ -1,75 +1,150 @@
-"""Vista unica del panel de vencimientos.
+"""Vistas de la Eva 2.
 
-No hay base de datos: la vista abre datos.json y reutiliza la regla de
-decision que ya escribi en solucion.py (Fase 1). No se vuelve a escribir.
+Los datos ya no salen de datos.json sino de SQLite. La regla de decision
+sigue siendo la misma de la ES1: se importa, no se copia.
 """
 
-import json
-import os
-from datetime import date
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
-from django.shortcuts import render
+from .forms import LoteForm
+from .models import Lote
+from .permisos import ROL_ADMIN, ROL_NORMAL, ROL_VIEWER, requiere_rol
 
-# solucion.py esta justo al lado de manage.py, por eso Django ya lo puede
-# importar directo: no hace falta tocar sys.path.
-from solucion import clasificar_insumo
-
-ARCHIVO_DATOS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datos.json")
+# ---------------------------------------------------------------
+# Sesion
+# ---------------------------------------------------------------
 
 
-def resumen(request):
-    # 1. La vista lee el archivo JSON (aca no hay modelos ni migraciones).
-    if os.path.exists(ARCHIVO_DATOS):
-        with open(ARCHIVO_DATOS, encoding="utf-8") as f:
-            registros = json.load(f)
-    else:
-        registros = []
+def vista_login(request):
+    if request.user.is_authenticated:
+        return redirect("lista")
 
-    # 2. Se vuelve a clasificar cada lote con la fecha de HOY.
-    #    Asi el semaforo cambia solo con el paso de los dias.
-    lotes = []
-    for r in registros:
-        resultado = clasificar_insumo(r["categoria"], r["cantidad"], r["vence"])
-        lotes.append({
-            "nombre": r["nombre"],
-            "categoria": r["categoria"],
-            "lote": r["lote"],
-            "cantidad": r["cantidad"],
-            "vence": r["vence"],
-            "dias": resultado["dias"],
-            # Si la fecha no se pudo leer, en pantalla se muestra "?" y no "None".
-            "dias_texto": "?" if resultado["dias"] is None else resultado["dias"],
-            "estado": resultado["estado"],
-            "color": resultado["color"],
-            "motivo": resultado["motivo"],
-        })
+    if request.method == "POST":
+        usuario = authenticate(
+            request,
+            username=request.POST.get("username", "").strip(),
+            password=request.POST.get("password", ""),
+        )
+        if usuario is not None:
+            login(request, usuario)
+            messages.success(request, f"Bienvenido, {usuario.username}.")
+            return redirect("lista")
+        # Mensaje generico: no se dice cual de los dos datos fallo.
+        messages.error(request, "Usuario o contrasena incorrectos.")
 
-    # 3. Se ordenan por fecha de vencimiento: lo que vence antes va primero.
-    lotes = sorted(lotes, key=lambda x: x["vence"])
+    return render(request, "login.html")
 
-    # 4. Contadores del semaforo.
-    rojos = 0
-    amarillos = 0
-    verdes = 0
-    invalidos = 0
-    for lote in lotes:
-        if lote["estado"] == "ROJO":
-            rojos = rojos + 1
-        elif lote["estado"] == "AMARILLO":
-            amarillos = amarillos + 1
-        elif lote["estado"] == "VERDE":
-            verdes = verdes + 1
-        else:
-            invalidos = invalidos + 1
+
+@login_required(login_url="login")
+def vista_logout(request):
+    logout(request)
+    messages.info(request, "Sesion cerrada.")
+    return redirect("login")
+
+
+# ---------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------
+
+
+@login_required(login_url="login")
+def lista(request):
+    """READ. Todos los usuarios autenticados pueden mirar."""
+    lotes = Lote.objects.filter(eliminado=False)
+
+    # Buscador por nombre o numero de lote (era un Should de la ES1).
+    busqueda = request.GET.get("q", "").strip()
+    if busqueda:
+        lotes = lotes.filter(Q(nombre__icontains=busqueda) | Q(numero_lote__icontains=busqueda))
+
+    # Filtro por estado. Se resuelve en Python y no en la base porque el
+    # estado de hoy es calculado, no una columna.
+    filtro = request.GET.get("estado", "").upper()
+    lotes = list(lotes)
+    if filtro in ("ROJO", "AMARILLO", "VERDE", "INVALIDO"):
+        lotes = [l for l in lotes if l.estado_actual == filtro]
+
+    contadores = {"ROJO": 0, "AMARILLO": 0, "VERDE": 0, "INVALIDO": 0}
+    for lote in Lote.objects.filter(eliminado=False):
+        contadores[lote.estado_actual] = contadores.get(lote.estado_actual, 0) + 1
 
     contexto = {
         "lotes": lotes,
-        "hoy": date.today().strftime("%d-%m-%Y"),
-        "total": len(lotes),
-        "rojos": rojos,
-        "amarillos": amarillos,
-        "verdes": verdes,
-        "invalidos": invalidos,
-        "unidades_en_riesgo": sum(l["cantidad"] for l in lotes if l["estado"] == "ROJO"),
+        "hoy": timezone.localdate().strftime("%d-%m-%Y"),
+        "busqueda": busqueda,
+        "filtro": filtro,
+        "rojos": contadores["ROJO"],
+        "amarillos": contadores["AMARILLO"],
+        "verdes": contadores["VERDE"],
+        "invalidos": contadores["INVALIDO"],
+        "total": sum(contadores.values()),
+        "unidades_en_riesgo": sum(
+            l.cantidad for l in Lote.objects.filter(eliminado=False) if l.estado_actual == "ROJO"
+        ),
     }
-    return render(request, "resumen.html", contexto)
+    return render(request, "lista.html", contexto)
+
+
+@requiere_rol(ROL_ADMIN, ROL_NORMAL)
+def crear(request):
+    """CREATE. El bodeguero (normal) y el admin pueden recibir lotes."""
+    if request.method == "POST":
+        form = LoteForm(request.POST)
+        if form.is_valid():
+            lote = form.save(commit=False)
+            lote.guardar_clasificado()  # clasifica antes de guardar
+            messages.success(
+                request, f"Lote {lote.numero_lote} registrado como {lote.estado_registro}."
+            )
+            return redirect("lista")
+        messages.error(request, "Revisa los datos marcados en rojo.")
+    else:
+        form = LoteForm()
+
+    return render(request, "form.html", {"form": form, "accion": "Registrar"})
+
+
+@requiere_rol(ROL_ADMIN)
+def editar(request, pk):
+    """UPDATE. Solo el admin corrige una ficha ya registrada."""
+    lote = get_object_or_404(Lote, pk=pk, eliminado=False)
+
+    if request.method == "POST":
+        form = LoteForm(request.POST, instance=lote)
+        if form.is_valid():
+            lote = form.save(commit=False)
+            # Se vuelve a clasificar: si cambio la cantidad o la fecha, el
+            # estado guardado ya no corresponde.
+            lote.guardar_clasificado()
+            messages.success(request, f"Lote {lote.numero_lote} actualizado.")
+            return redirect("lista")
+        messages.error(request, "Revisa los datos marcados en rojo.")
+    else:
+        form = LoteForm(instance=lote)
+
+    return render(request, "form.html", {"form": form, "accion": "Editar", "lote": lote})
+
+
+@requiere_rol(ROL_ADMIN)
+def eliminar(request, pk):
+    """DELETE logico. La merma no se borra, se oculta."""
+    lote = get_object_or_404(Lote, pk=pk, eliminado=False)
+
+    if request.method == "POST":
+        lote.soft_delete()
+        messages.success(request, f"Lote {lote.numero_lote} dado de baja.")
+        return redirect("lista")
+
+    return render(request, "confirmar.html", {"lote": lote})
+
+
+@requiere_rol(ROL_ADMIN)
+def detalle(request, pk):
+    """Ficha completa, incluidos los lotes dados de baja."""
+    lote = get_object_or_404(Lote, pk=pk)
+    return render(request, "detalle.html", {"lote": lote})

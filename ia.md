@@ -1,95 +1,218 @@
-# ia.md · Uso de inteligencia artificial en la ES1
+# ia.md · Uso de inteligencia artificial
+
+**TI3V41 · Programación Back End**
+**Estudiante:** Cristóbal Contreras
+
+> Actualizado para la Eva 2. La sección de la ES1 queda al final como
+> antecedente, porque describe decisiones que siguen vigentes.
+
+---
+
+# Parte 1 · Eva 2 (base de datos, CRUD, roles)
 
 ## Qué herramienta usé y para qué
 
-Usé Claude (Anthropic). La consulté para dos cosas: ordenar el `plan.md` (redactar el problema,
-el alcance y la priorización MoSCoW) y revisar la estructura del proyecto Django antes de armarlo.
-No la usé como reemplazo del código: cada archivo lo revisé línea por línea y hay partes que
-reescribí porque no calzaban con lo que pide la evaluación.
+Usé Claude (Anthropic). La consulté para planificar la migración del
+proyecto desde `datos.json` a base de datos: cómo traducir las claves del
+JSON a campos de un modelo, cómo armar los roles con grupos de Django y
+cómo probar que los permisos realmente cortan en el servidor.
 
-## Una consulta concreta
+No la usé para que escribiera el proyecto de corrido. Lo que pedí fue
+estructura y explicación; cada archivo lo revisé, lo corrí y en varios
+casos lo cambié, por las razones que están más abajo.
 
-Le escribí, en resumen: *"Soy estudiante de programación back end, primer semestre. Quiero
-resolver el problema de los insumos que se vencen en la bodega de una cocina central. Ayúdame a
-escribir un plan de 2 planas con apartado de negocio y apartado técnico, con la regla de decisión
-de 4 resultados. Restricción: se resuelve con variables, if/elif, un archivo JSON y una sola vista
-Django. Sin base de datos, sin login, sin API."*
+## Consultas concretas
 
-La respuesta me sirvió sobre todo para separar los Must de los Should. Yo tenía mezcladas cosas
-como el filtro por color y la búsqueda por lote dentro de lo imprescindible, y quedó claro que el
-programa igual resuelve el problema sin eso.
+**Sobre el modelo:**
 
-## Qué estaba mal, qué sobraba y cómo lo corregí
+> *«Tengo un proyecto Django que guarda lotes de insumos en un
+> datos.json. Cada registro tiene nombre, categoria, lote, cantidad,
+> vence, estado y motivo. El estado sale de una función
+> `clasificar_insumo()` que compara la fecha de vencimiento contra la
+> fecha de hoy y devuelve ROJO, AMARILLO, VERDE o INVALIDO. ¿Cómo
+> traduzco eso a un modelo de Django sin reescribir la función? ¿El
+> estado va como campo guardado o se calcula?»*
 
-1. **Me propuso base de datos.** Mi idea inicial del proyecto tenía dos modelos, `Categoria` e
-   `Insumo`, con `models.py` y migraciones. La primera respuesta siguió esa idea y me armó los
-   modelos. Eso no sirve para esta evaluación: la Unidad 1 es sin base de datos. Lo corregí
-   dejando los modelos en la lista de **Won't**, y la vista ahora abre `datos.json` directamente
-   con `json.load()`. En `core/` no hay modelos ni migraciones ejecutadas.
+**Sobre los roles:**
 
-2. **Me dejaba solo 3 resultados.** La versión inicial de la regla tenía rojo, amarillo y verde,
-   pero no el caso del dato inválido. Agregué esa cuarta rama y la puse **primera** en el `if`,
-   porque si una fecha viene mal escrita no se puede restar contra la fecha de hoy y el programa
-   se cae antes de llegar a revisarla.
+> *«Necesito tres roles: uno que sólo mire, uno que pueda crear y uno que
+> pueda todo. ¿Grupos de Django o un campo `rol` en un modelo propio?
+> ¿Cómo pruebo que el permiso no se puede saltar escribiendo la URL?»*
 
-3. **Repetía la regla de decisión dentro de la vista.** El código propuesto volvía a escribir los
-   `if` dentro de `views.py`. Lo cambié: `views.py` importa `clasificar_insumo` desde
-   `solucion.py`. Tuve que agregar la carpeta raíz al `sys.path`, porque `solucion.py` está una
-   carpeta más arriba que `miproyecto/`. Esa parte me costó entenderla y la probé hasta que el
-   `import` funcionó.
+## Qué corregí de lo que me respondió
 
-4. **Un detalle que no entendía al principio:** por qué la vista vuelve a calcular los días si el
-   estado ya está guardado en el JSON. Lo entendí probando: si solo mostrara lo guardado, un lote
-   registrado como verde seguiría verde para siempre. Al recalcular con `date.today()`, el
-   semáforo se mueve solo con el paso de los días. Ese es justamente el punto del proyecto.
+### 1. El estado no podía ser un campo guardado y punto
 
-## Segunda revisión, contra la rúbrica
+El guion de la unidad y la primera respuesta de la IA proponen lo mismo:
+guardar el resultado en un campo `resultado` y mostrarlo en la lista. En
+casi cualquier proyecto eso está bien, pero en este **no**: acá el estado
+depende de la fecha de hoy, así que un lote guardado como VERDE seguiría
+viéndose verde dos semanas después de vencido. Es justo el error que el
+sistema debe evitar.
 
-Antes de entregar probé el programa con casos límite (mayúsculas/minúsculas, fecha con espacios,
-día exacto del umbral) y encontré 3 errores que la IA no me había marcado y que yo tampoco vi a
-la primera:
+Lo resolví con dos cosas distintas en vez de una:
 
-1. **Categoría sensible a mayúsculas.** Si escribía "carnes" en vez de "Carnes", el programa la
-   marcaba como dato inválido aunque la categoría existiera. El diccionario de umbrales usa las
-   categorías con mayúscula inicial y la comparación `categoria not in UMBRALES` era literal.
-   Corregí `clasificar_insumo` para que normalice la categoría con `.strip().capitalize()` antes
-   de compararla.
+```python
+estado_registro = models.CharField(max_length=20)   # foto al registrar
 
-2. **Fecha con espacios se marcaba inválida.** Si `datos.json` traía `" 2026-09-01 "` con espacios
-   (por ejemplo, editado a mano), `datetime.strptime` fallaba aunque la fecha fuera correcta.
-   Agregué `.strip()` antes de convertir la fecha.
+@property
+def estado_actual(self):                             # semaforo de hoy
+    return self.clasificacion["estado"]
+```
 
-3. **El más importante: la tabla de consola mostraba el estado guardado, no el actual.** Cada
-   registro guarda el estado que tenía el día en que se ingresó. Pero `mostrar_tabla` recalculaba
-   los días con la fecha de hoy y al mismo tiempo mostraba el estado viejo del JSON, así que un
-   lote con -4 días aparecía como "AMARILLO" en vez de "ROJO". Lo detecté comparando la fecha real
-   del sistema contra las fechas de mi archivo de prueba. Lo corregí para que `mostrar_tabla` llame
-   a `clasificar_insumo` de nuevo por cada fila, igual que ya hacía la vista Django, en vez de
-   confiar en el campo `estado` guardado.
+Y agregué `cambio_de_estado`, que compara las dos y hace que la lista
+avise «registrado como VERDE» cuando ya no lo está. Es la misma decisión
+que había tomado en la ES1 para la vista, sólo que ahora vive en el
+modelo. Está probado en `ModeloTest.test_el_estado_guardado_envejece_y_el_actual_no`.
 
-Ninguno de estos tres errores estaba en el código que la IA propuso originalmente ni en la primera
-versión que yo armé; aparecieron al hacer pruebas con fechas y mayúsculas distintas a las que usé
-la primera vez, así que los arreglé por mi cuenta antes de entregar.
+### 2. El modelo de ejemplo no era el de mi proyecto
 
-## Tercera revisión, contra una versión actualizada del PDF de instrucciones
+El ejemplo de referencia usa un modelo genérico (`nombre`, `cantidad`,
+`estado`) con dos opciones, «al día» y «moroso». Si lo copiaba tal cual,
+el proyecto dejaba de ser el mío: no hay fecha de vencimiento, que es el
+dato del que depende todo. Lo reescribí con los campos reales del JSON y
+mantuve del ejemplo lo que sí correspondía: el borrado lógico y el
+`soft_delete()`.
 
-El docente subió una versión más detallada del PDF de instrucciones, con dos diferencias
-importantes respecto a la que usé al principio:
+También evité duplicar la lista de categorías. La IA la proponía escrita
+a mano en el `choices`, pero esa lista ya existe en `UMBRALES` dentro de
+`solucion.py`; tenerla en dos lugares significa que algún día van a
+quedar distintas. Quedó así:
 
-1. **Ubicación de archivos.** El PDF nuevo trae un árbol de carpetas explícito donde
-   `solucion.py` y `datos.json` van justo al lado de `manage.py`, no en una carpeta aparte. Yo los
-   tenía un nivel más arriba, y por eso `core/views.py` tenía un parche con `sys.path.append` para
-   poder importar `solucion.py` desde ahí. Moví ambos archivos a la ubicación correcta y saqué el
-   parche: ahora la vista hace `from solucion import clasificar_insumo` directo, porque Django ya
-   agrega la carpeta de `manage.py` al `sys.path` automáticamente. El código quedó más simple y
-   más parecido al ejemplo de referencia que menciona el PDF.
+```python
+CATEGORIA_CHOICES = [(c, c) for c in UMBRALES]
+```
 
-2. **Archivo `.env`.** El PDF nuevo pide sacar la `SECRET_KEY` de `settings.py` y ponerla en un
-   archivo `.env` que no se sube, usando el paquete `python-decouple`. Antes tenía la clave escrita
-   directo en el código (así la deja Django por defecto al crear el proyecto). Instalé
-   `python-decouple`, cambié `settings.py` para que lea `SECRET_KEY` y `DEBUG` con
-   `config('SECRET_KEY')` y `config('DEBUG', default=False, cast=bool)`, y agregué `.env` (con la
-   clave real, no se sube), `.env.example` (con una clave de ejemplo, sí se sube) y `.gitignore`
-   con `.env` adentro. Probé que si borro el `.env`, el proyecto efectivamente deja de funcionar
-   con `UndefinedValueError` en vez de arrancar con una clave inventada, que es el comportamiento
-   que pide el PDF.
+### 3. Las vistas con `request.POST` crudo no validaban nada
+
+El código propuesto leía los campos directo del `request.POST` y
+convertía la cantidad con un `int()` dentro de un `try`. Funciona, pero
+la validación queda repartida dentro de la vista y hay que repetirla
+igual en crear y en editar.
+
+Lo cambié por un `ModelForm` (`core/forms.py`). Con eso la validación
+está en un solo lugar, las dos vistas la reutilizan, y pude agregar una
+regla de negocio que el `try/except` no cubría: **no se recibe en bodega
+un lote que ya está vencido**, usando la misma clasificación en vez de
+volver a comparar fechas.
+
+### 4. Permisos sólo en la plantilla
+
+La primera propuesta escondía los botones con `{% if %}` y lo daba por
+resuelto. Eso no es seguridad: la dirección se puede escribir a mano. Lo
+corregí poniendo el decorador `@requiere_rol(...)` en cada vista y dejé
+el `{% if %}` sólo como comodidad visual.
+
+Lo comprobé levantando el servidor y entrando con cada usuario a las
+direcciones directas, sin usar los botones:
+
+```
+lector      /lotes/crear/ -> BLOQUEADO   /lotes/1/editar/ -> BLOQUEADO
+bodeguero   /lotes/crear/ -> permitido   /lotes/1/editar/ -> BLOQUEADO
+jefe        /lotes/crear/ -> permitido   /lotes/1/editar/ -> permitido
+sin sesión  /lotes/crear/ -> /login/?next=/lotes/crear/
+```
+
+Además lo dejé como prueba automática, incluyendo el caso del POST
+directo: `PermisosTest.test_normal_no_puede_eliminar_por_post_directo`.
+Ese caso importa porque bloquear sólo el GET deja la puerta abierta.
+
+### 5. El código de ejemplo no compilaba
+
+Esto no es culpa de la IA sino del material que copié, pero vale
+anotarlo porque me costó un rato: el guion trae `if request.method =
+"POST"` con un solo `=`, `def _str_` en vez de `__str__`, `name _in` en
+vez de `name__in` y `makemigrations -check` con un guion. Lo copié tal
+cual y no corría. Son erratas de formato del PDF, pero el que las copia
+sin leer pierde media hora.
+
+## Lo que encontré yo al probar
+
+**La migración de datos rechazó 2 de 8 registros.** Al correr
+`cargar_datos` pasó esto:
+
+```
+Rechazado 'Harina sin cernir' (H-0104): categoria: Valor 'Abarrotes' no es una opción válida.
+Rechazado 'Tomate triturado' (TM-8834A): categoria: Valor 'Conservas y salsas' no es una opción válida.
+Cargados: 6
+```
+
+No lo había previsto y al principio pensé que el script estaba malo.
+Revisándolo, es correcto: esos dos registros eran justamente los que en
+el JSON quedaban guardados como `INVALIDO`, porque el archivo dejaba
+entrar cualquier cosa. La base, con `choices`, los frena en la puerta.
+Decidí que el comando los **informe y los salte** en vez de cargarlos
+mal, y lo dejé documentado en el README, porque es una diferencia real
+entre un JSON y una base de datos y no un error que haya que esconder.
+
+**Un test mío estaba mal escrito.** `test_eliminar_es_logico` fallaba
+buscando que el número de lote no apareciera en la página. Fallaba
+siempre, aunque el borrado funcionara bien: el mensaje de éxito dice
+«Lote L-1180 dado de baja», así que el texto aparecía igual. Lo corregí
+para revisar la lista del contexto en vez del HTML completo. El código
+nunca estuvo malo; la prueba sí.
+
+**El `User` de Django ya cifra las contraseñas.** Lo verifiqué en vez de
+asumirlo:
+`SesionTest.test_la_contrasena_no_se_guarda_en_texto_plano` comprueba que
+el campo empieza con `pbkdf2_`. Por eso no hay ningún modelo propio de
+usuarios, y las contraseñas de los usuarios de prueba salen del `.env`:
+si estuvieran escritas en `crear_roles.py`, cualquiera que clone el
+repositorio entraría como administrador.
+
+## Resultado
+
+```
+python manage.py check                              -> sin issues
+python manage.py makemigrations --check --dry-run   -> No changes detected
+python manage.py test                               -> Ran 29 tests ... OK
+```
+
+---
+
+# Parte 2 · ES1 (antecedente)
+
+## Qué herramienta usé y para qué
+
+Usé Claude. La consulté para ordenar el `plan.md` y revisar la estructura
+del proyecto Django antes de armarlo. Cada archivo lo revisé línea por
+línea y hay partes que reescribí porque no calzaban con la evaluación.
+
+## Qué corregí entonces
+
+1. **Me propuso base de datos.** La Unidad 1 era sin base de datos. Dejé
+   los modelos en Won't y la vista leía `datos.json` directo. *(En la Eva
+   2 esto se revirtió: ahora sí hay base de datos, y el plan.md quedó
+   actualizado.)*
+
+2. **Me dejaba sólo 3 resultados.** Faltaba el caso del dato inválido.
+   Lo agregué y lo puse **primero** en el `if`, porque una fecha mal
+   escrita no se puede restar contra la fecha de hoy.
+
+3. **Repetía la regla de decisión dentro de la vista.** Lo cambié para
+   que `views.py` importara `clasificar_insumo` desde `solucion.py`. Esa
+   decisión sigue vigente: en la Eva 2 el que importa la regla es el
+   modelo, y sigue sin estar copiada en ninguna parte.
+
+4. **Por qué recalcular si el estado ya está guardado.** Lo entendí
+   probando: si sólo mostrara lo guardado, un lote registrado como verde
+   seguiría verde para siempre. Es la base de la decisión de diseño de la
+   Eva 2.
+
+## Errores que encontré probando (ES1)
+
+1. **Categoría sensible a mayúsculas:** «carnes» se marcaba inválida.
+   Corregido normalizando con `.strip().capitalize()`.
+2. **Fecha con espacios se marcaba inválida.** Corregido con `.strip()`
+   antes de convertir.
+3. **La tabla de consola mostraba el estado guardado, no el actual.**
+   Corregido para que `mostrar_tabla` vuelva a clasificar cada fila.
+
+## Tercera revisión (ES1), contra el PDF actualizado
+
+1. **Ubicación de archivos:** moví `solucion.py` y `datos.json` junto a
+   `manage.py` y saqué el parche de `sys.path.append`.
+2. **Archivo `.env`:** saqué la `SECRET_KEY` de `settings.py` con
+   `python-decouple` y agregué `.env`, `.env.example` y `.gitignore`.
+   *(En la Eva 2 esto se amplió: ahora también la conexión a la base de
+   datos y las contraseñas de los usuarios de prueba salen del `.env`.)*
