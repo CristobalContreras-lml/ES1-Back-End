@@ -28,7 +28,7 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
 
 
 # Application definition
@@ -65,6 +65,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.roles',
             ],
         },
     },
@@ -76,12 +77,30 @@ WSGI_APPLICATION = 'miproyecto.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# La conexion se arma con variables de entorno (.env), no escrita a mano.
+# Por defecto queda SQLite, que es lo que pide la unidad y Django ya trae.
+# Si manana se cambia a PostgreSQL solo se edita el .env: el codigo no se toca.
+DB_ENGINE = config("DB_ENGINE", default="django.db.backends.sqlite3")
+
+if DB_ENGINE.endswith("sqlite3"):
+    DATABASES = {
+        "default": {
+            "ENGINE": DB_ENGINE,
+            "NAME": BASE_DIR / config("DB_NAME", default="db.sqlite3"),
+        }
     }
-}
+else:
+    # Credenciales fuera del codigo: aca nunca hay usuario ni contrasena.
+    DATABASES = {
+        "default": {
+            "ENGINE": DB_ENGINE,
+            "NAME": config("DB_NAME"),
+            "USER": config("DB_USER"),
+            "PASSWORD": config("DB_PASSWORD"),
+            "HOST": config("DB_HOST", default="localhost"),
+            "PORT": config("DB_PORT", default="5432"),
+        }
+    }
 
 
 # Password validation
@@ -106,9 +125,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-cl'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Santiago'
 
 USE_I18N = True
 
@@ -128,4 +147,35 @@ MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
+}
+
+
+# Sesiones y login
+# https://docs.djangoproject.com/en/6.1/topics/auth/default/
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "lista"
+LOGOUT_REDIRECT_URL = "login"
+
+# La cookie de sesion no se puede leer desde JavaScript y caduca al cerrar
+# el navegador. En produccion (DEBUG=False) ademas viaja solo por HTTPS.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 horas
+CSRF_COOKIE_HTTPONLY = False  # el token se lee en el formulario, no en JS
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+
+# Mensajes al usuario (django.contrib.messages)
+from django.contrib.messages import constants as mensajes  # noqa: E402
+
+MESSAGE_TAGS = {
+    mensajes.DEBUG: "debug",
+    mensajes.INFO: "info",
+    mensajes.SUCCESS: "exito",
+    mensajes.WARNING: "aviso",
+    mensajes.ERROR: "error",
 }
